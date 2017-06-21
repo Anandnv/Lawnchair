@@ -18,6 +18,8 @@ package ch.deletescape.lawnchair.dragndrop;
 
 import android.graphics.Point;
 
+import ch.deletescape.lawnchair.DropTarget;
+
 /**
  * Set of options to control the drag and drop behavior.
  */
@@ -37,6 +39,17 @@ public class DragOptions {
      * Determines when a deferred drag should start. By default, drags aren't deferred at all.
      */
     public DeferDragCondition deferDragCondition = new DeferDragCondition();
+
+    public PreDragCondition preDragCondition = null;
+
+    public interface PreDragCondition {
+        void onPreDragEnd(DropTarget.DragObject dragObject, boolean z);
+
+        void onPreDragStart(DropTarget.DragObject dragObject);
+
+        boolean shouldStartDrag(double d);
+    }
+
 
     /**
      * Specifies a condition that must be met before DragListener#onDragStart() is called.

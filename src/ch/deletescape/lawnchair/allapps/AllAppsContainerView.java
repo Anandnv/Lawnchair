@@ -36,6 +36,7 @@ import android.view.ViewGroup;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import ch.deletescape.lawnchair.AppInfo;
 import ch.deletescape.lawnchair.BaseContainerView;
@@ -59,6 +60,7 @@ import ch.deletescape.lawnchair.graphics.TintedDrawableSpan;
 import ch.deletescape.lawnchair.keyboard.FocusedItemDecorator;
 import ch.deletescape.lawnchair.shortcuts.DeepShortcutsContainer;
 import ch.deletescape.lawnchair.util.ComponentKey;
+import ch.deletescape.lawnchair.util.PackageUserKey;
 
 
 /**
@@ -599,4 +601,20 @@ public class AllAppsContainerView extends BaseContainerView implements DragSourc
     public boolean shouldRestoreImeState() {
         return !TextUtils.isEmpty(mSearchInput.getText());
     }
+
+
+    public void updateIconBadges(Set set) {
+        PackageUserKey packageUserKey = new PackageUserKey(null, null);
+        int childCount = this.mAppsRecyclerView.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            View childAt = this.mAppsRecyclerView.getChildAt(i);
+            if ((childAt instanceof BubbleTextView) && childAt.getTag() instanceof ItemInfo) {
+                ItemInfo itemInfo = (ItemInfo) childAt.getTag();
+                if (packageUserKey.updateFromItemInfo(itemInfo) && set.contains(packageUserKey)) {
+                    ((BubbleTextView) childAt).applyBadgeState(itemInfo, true);
+                }
+            }
+        }
+    }
+
 }

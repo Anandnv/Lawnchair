@@ -87,6 +87,7 @@ import ch.deletescape.lawnchair.util.LongArrayMap;
 import ch.deletescape.lawnchair.util.ManagedProfileHeuristic;
 import ch.deletescape.lawnchair.util.MultiHashMap;
 import ch.deletescape.lawnchair.util.PackageManagerHelper;
+import ch.deletescape.lawnchair.util.PackageUserKey;
 import ch.deletescape.lawnchair.util.StringFilter;
 import ch.deletescape.lawnchair.util.Thunk;
 import ch.deletescape.lawnchair.util.ViewOnDrawExecutor;
@@ -3455,34 +3456,34 @@ public class LauncherModel extends BroadcastReceiver
         }
     }
 
-    private void bindWidgetsModel(final Callbacks callbacks, final WidgetsModel model) {
-        mHandler.post(new Runnable() {
+    private void bindWidgetsModel(final Callbacks callbacks) {
+        final MultiHashMap clone = this.mBgWidgetsModel.getWidgetsMap().clone();
+        this.mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Callbacks cb = getCallback();
-                if (callbacks == cb && cb != null) {
-                    callbacks.bindWidgetsModel(model);
+                Callbacks callback = LauncherModel.this.getCallback();
+                if (callbacks == callback && callback != null) {
+                    callbacks.bindAllWidgets(clone);
                 }
             }
         });
     }
 
-    public void refreshAndBindWidgetsAndShortcuts(
-            final Callbacks callbacks, final boolean bindFirst) {
+
+    public void refreshAndBindWidgetsAndShortcuts(final Callbacks callbacks, final boolean z, final PackageUserKey packageUserKey) {
         runOnWorkerThread(new Runnable() {
             @Override
             public void run() {
-                if (bindFirst && !mBgWidgetsModel.isEmpty()) {
-                    bindWidgetsModel(callbacks, mBgWidgetsModel.clone());
+                if (z && (!LauncherModel.this.mBgWidgetsModel.isEmpty())) {
+                    LauncherModel.this.bindWidgetsModel(callbacks);
                 }
-                final WidgetsModel model = mBgWidgetsModel.updateAndClone(mApp.getContext());
-                bindWidgetsModel(callbacks, model);
-                // update the Widget entries inside DB on the worker thread.
-                LauncherAppState.getInstance().getWidgetCache().removeObsoletePreviews(
-                        model.getRawList());
+                ArrayList update = LauncherModel.this.mBgWidgetsModel.update(LauncherModel.this.mApp.getContext(), packageUserKey);
+                LauncherModel.this.bindWidgetsModel(callbacks);
+                LauncherModel.this.mApp.getWidgetCache().removeObsoletePreviews(update, packageUserKey);
             }
         });
     }
+
 
     @Thunk
     static boolean isPackageDisabled(Context context, String packageName,

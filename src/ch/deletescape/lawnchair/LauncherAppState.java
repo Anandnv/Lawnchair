@@ -65,6 +65,10 @@ public class LauncherAppState {
         return sContext;
     }
 
+    public DeepShortcutManager getDeepShortcutManager() {
+        return mDeepShortcutManager;
+    }
+
     static void setLauncherProvider(LauncherProvider provider) {
         if (sLauncherProvider != null) {
             Log.w(Launcher.TAG, "setLauncherProvider called twice! old=" +

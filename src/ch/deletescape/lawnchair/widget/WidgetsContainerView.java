@@ -27,6 +27,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import java.util.List;
+
 import ch.deletescape.lawnchair.BaseContainerView;
 import ch.deletescape.lawnchair.CellLayout;
 import ch.deletescape.lawnchair.DeleteDropTarget;
@@ -46,6 +48,7 @@ import ch.deletescape.lawnchair.dragndrop.DragController;
 import ch.deletescape.lawnchair.dragndrop.DragOptions;
 import ch.deletescape.lawnchair.folder.Folder;
 import ch.deletescape.lawnchair.model.WidgetsModel;
+import ch.deletescape.lawnchair.util.PackageUserKey;
 import ch.deletescape.lawnchair.util.Thunk;
 import ch.deletescape.lawnchair.util.TransformingTouchDelegate;
 
@@ -136,6 +139,10 @@ public class WidgetsContainerView extends BaseContainerView
                 || mLauncher.getWorkspace().isSwitchingState()
                 || !(v instanceof WidgetCell)) return;
 
+        handleClick();
+    }
+
+    public void handleClick() {
         // Let the user know that they have to long press to add a widget
         if (mWidgetInstructionToast != null) {
             mWidgetInstructionToast.cancel();
@@ -150,6 +157,11 @@ public class WidgetsContainerView extends BaseContainerView
 
     @Override
     public boolean onLongClick(View v) {
+        return handleLongClick(v);
+
+    }
+
+    public boolean handleLongClick(View v) {
         // Return early if this is not initiated from a touch
         if (!v.isInTouchMode()) return false;
         // When we have exited all apps or are in transition, disregard long clicks
@@ -330,6 +342,10 @@ public class WidgetsContainerView extends BaseContainerView
 
     public boolean isEmpty() {
         return mAdapter.getItemCount() == 0;
+    }
+
+    public List getWidgetsForPackageUser(PackageUserKey packageUserKey) {
+        return mAdapter.copyWidgetsForPackageUser(packageUserKey);
     }
 
     private WidgetPreviewLoader getWidgetPreviewLoader() {

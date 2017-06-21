@@ -154,4 +154,9 @@
         <item name="android:textColor">#ffffffff</item>
         <item name="android:background">?android:attr/selectableItemBackground</item>
     </style>
+
+    <style name="AllAppsNavBarProtection">
+        <item name="android:background">@color/default_shadow_color_no_alpha</item>
+        <item name="android:alpha">?android:spotShadowAlpha</item>
+    </style>
 </resources>

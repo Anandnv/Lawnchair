@@ -87,6 +87,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import ch.deletescape.lawnchair.DropTarget.DragObject;
 import ch.deletescape.lawnchair.LauncherSettings.Favorites;
@@ -107,6 +108,8 @@ import ch.deletescape.lawnchair.folder.Folder;
 import ch.deletescape.lawnchair.folder.FolderIcon;
 import ch.deletescape.lawnchair.keyboard.ViewGroupFocusHelper;
 import ch.deletescape.lawnchair.model.WidgetsModel;
+import ch.deletescape.lawnchair.popup.PopupContainerWithArrow;
+import ch.deletescape.lawnchair.popup.PopupDataProvider;
 import ch.deletescape.lawnchair.settings.Settings;
 import ch.deletescape.lawnchair.shortcuts.DeepShortcutManager;
 import ch.deletescape.lawnchair.shortcuts.DeepShortcutsContainer;
@@ -116,6 +119,7 @@ import ch.deletescape.lawnchair.util.ComponentKey;
 import ch.deletescape.lawnchair.util.ItemInfoMatcher;
 import ch.deletescape.lawnchair.util.MultiHashMap;
 import ch.deletescape.lawnchair.util.PackageManagerHelper;
+import ch.deletescape.lawnchair.util.PackageUserKey;
 import ch.deletescape.lawnchair.util.PendingRequestArgs;
 import ch.deletescape.lawnchair.util.Thunk;
 import ch.deletescape.lawnchair.util.ViewOnDrawExecutor;
@@ -313,6 +317,8 @@ public class Launcher extends Activity
 
     private LauncherTab mLauncherTab;
 
+    private PopupDataProvider mPopupDataProvider;
+
     @Thunk
     Runnable mBuildLayersRunnable = new Runnable() {
         @Override
@@ -370,7 +376,7 @@ public class Launcher extends Activity
         mDeviceProfile.layout(this, false /* notifyListeners */);
         mExtractedColors = new ExtractedColors();
         loadExtractedColorsAndColorItems();
-
+        mPopupDataProvider = new PopupDataProvider(this);
         ((AccessibilityManager) getSystemService(ACCESSIBILITY_SERVICE))
                 .addAccessibilityStateChangeListener(this);
 
@@ -401,6 +407,10 @@ public class Launcher extends Activity
             reloadIcons();
         }
         Settings.init(this);
+    }
+
+    public PopupDataProvider getPopupDataProvider() {
+        return mPopupDataProvider;
     }
 
     public void scheduleKill() {
@@ -757,6 +767,10 @@ public class Launcher extends Activity
 
         if (Utilities.isNycMR1OrAbove()) {
             mAppWidgetHost.startListening();
+        }
+
+        if (!isWorkspaceLoading()) {
+            ch.deletescape.lawnchair.notification.NotificationListener.setNotificationsChangedListener(mPopupDataProvider);
         }
 
         mLauncherTab.getClient().onStart();
@@ -1265,6 +1279,23 @@ public class Launcher extends Activity
             }
         }
     };
+
+    public void updateIconBadges(final Set set) {
+        Runnable anonymousClass13 = new Runnable() {
+            @Override
+            public void run() {
+                Launcher.this.mWorkspace.updateIconBadges(set);
+                Launcher.this.mAppsView.updateIconBadges(set);
+                PopupContainerWithArrow open = PopupContainerWithArrow.getOpen(Launcher.this);
+                if (open != null) {
+                    open.updateNotificationHeader(set);
+                }
+            }
+        };
+        if (!waitUntilResume(anonymousClass13)) {
+            anonymousClass13.run();
+        }
+    }
 
     @Override
     public void onAttachedToWindow() {
@@ -2305,7 +2336,7 @@ public class Launcher extends Activity
         }
     }
 
-    private Bundle getActivityLaunchOptions(View v) {
+    public Bundle getActivityLaunchOptions(View v) {
         if (Utilities.ATLEAST_MARSHMALLOW) {
             int left = 0, top = 0;
             int width = v.getMeasuredWidth(), height = v.getMeasuredHeight();
@@ -2331,7 +2362,7 @@ public class Launcher extends Activity
         return null;
     }
 
-    private Rect getViewBounds(View v) {
+    public Rect getViewBounds(View v) {
         int[] pos = new int[2];
         v.getLocationOnScreen(pos);
         return new Rect(pos[0], pos[1], pos[0] + v.getWidth(), pos[1] + v.getHeight());
@@ -3458,6 +3489,8 @@ public class Launcher extends Activity
             mPendingActivityResult = null;
         }
 
+
+        ch.deletescape.lawnchair.notification.NotificationListener.setNotificationsChangedListener(mPopupDataProvider);
         InstallShortcutReceiver.disableAndFlushInstallQueue(this);
     }
 
@@ -3511,6 +3544,7 @@ public class Launcher extends Activity
      */
     @Override
     public void bindDeepShortcutMap(MultiHashMap<ComponentKey, String> deepShortcutMapCopy) {
+        mPopupDataProvider.setDeepShortcutMap(deepShortcutMapCopy);
         mDeepShortcutMap = deepShortcutMapCopy;
     }
 
@@ -3704,14 +3738,28 @@ public class Launcher extends Activity
             mWidgetsView.addWidgets(model);
             mWidgetsModel = null;
         }
+
+        AbstractFloatingView topOpenView = AbstractFloatingView.getTopOpenView(this);
+        if (topOpenView != null) {
+            topOpenView.onWidgetsBound();
+        }
+    }
+
+    public List getWidgetsForPackageUser(PackageUserKey packageUserKey) {
+        return mWidgetsView.getWidgetsForPackageUser(packageUserKey);
     }
 
     @Override
     public void notifyWidgetProvidersChanged() {
         if (mWorkspace.getState().shouldUpdateWidget) {
-            mModel.refreshAndBindWidgetsAndShortcuts(this, mWidgetsView.isEmpty());
+            refreshAndBindWidgetsForPackageUser(null);
         }
     }
+
+    public void refreshAndBindWidgetsForPackageUser(PackageUserKey packageUserKey) {
+        this.mModel.refreshAndBindWidgetsAndShortcuts(this, this.mWidgetsView.isEmpty(), packageUserKey);
+    }
+
 
     private void markAppsViewShown() {
         if (mSharedPrefs.getBoolean(APPS_VIEW_SHOWN, false)) {

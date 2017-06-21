@@ -36,7 +36,7 @@ import ch.deletescape.lawnchair.shortcuts.ShortcutInfoCompat;
 /**
  * Represents a launchable icon on the workspaces and in folders.
  */
-public class ShortcutInfo extends ItemInfo {
+public class ShortcutInfo extends ItemInfoWithIcon {
 
     public static final int DEFAULT = 0;
 
@@ -274,6 +274,7 @@ public class ShortcutInfo extends ItemInfo {
         }
     }
 
+    @Override
     public ComponentName getTargetComponent() {
         return promisedIntent != null ? promisedIntent.getComponent() : intent.getComponent();
     }

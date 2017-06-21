@@ -32,6 +32,15 @@ public class WidgetItem extends ComponentKey implements Comparable<WidgetItem> {
     public final String label;
     public final int spanX, spanY;
 
+    public WidgetItem(LauncherAppWidgetProviderInfo launcherAppWidgetProviderInfo, PackageManager packageManager, InvariantDeviceProfile invariantDeviceProfile) {
+        super(launcherAppWidgetProviderInfo.provider, launcherAppWidgetProviderInfo.getProfile());
+        this.label = Utilities.trim(launcherAppWidgetProviderInfo.getLabel(packageManager));
+        this.widgetInfo = launcherAppWidgetProviderInfo;
+        this.activityInfo = null;
+        this.spanX = Math.min(launcherAppWidgetProviderInfo.spanX, invariantDeviceProfile.numColumns);
+        this.spanY = Math.min(launcherAppWidgetProviderInfo.spanY, invariantDeviceProfile.numRows);
+    }
+
     public WidgetItem(LauncherAppWidgetProviderInfo info, AppWidgetManagerCompat widgetManager) {
         super(info.provider, widgetManager.getUser(info));
 

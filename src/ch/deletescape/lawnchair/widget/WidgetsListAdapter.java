@@ -21,16 +21,25 @@ import android.support.v7.widget.RecyclerView.Adapter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewGroup.LayoutParams;
 import android.widget.LinearLayout;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import ch.deletescape.lawnchair.LauncherAppState;
 import ch.deletescape.lawnchair.R;
 import ch.deletescape.lawnchair.WidgetPreviewLoader;
+import ch.deletescape.lawnchair.compat.AlphabeticIndexCompat;
+import ch.deletescape.lawnchair.model.PackageItemInfo;
 import ch.deletescape.lawnchair.model.WidgetItem;
 import ch.deletescape.lawnchair.model.WidgetsModel;
+import ch.deletescape.lawnchair.util.LabelComparator;
+import ch.deletescape.lawnchair.util.MultiHashMap;
+import ch.deletescape.lawnchair.util.PackageUserKey;
 
 /**
  * List view adapter for the widget tray.
@@ -42,8 +51,11 @@ import ch.deletescape.lawnchair.model.WidgetsModel;
  */
 public class WidgetsListAdapter extends Adapter<WidgetsRowViewHolder> {
 
+    private final ArrayList<WidgetListRowEntry> mEntries = new ArrayList<>();
+
     private final WidgetPreviewLoader mWidgetPreviewLoader;
     private final LayoutInflater mLayoutInflater;
+    private final AlphabeticIndexCompat mIndexer;
 
     private final View.OnClickListener mIconClickListener;
     private final View.OnLongClickListener mIconLongClickListener;
@@ -57,64 +69,81 @@ public class WidgetsListAdapter extends Adapter<WidgetsRowViewHolder> {
                               Context context) {
         mLayoutInflater = LayoutInflater.from(context);
         mWidgetPreviewLoader = LauncherAppState.getInstance().getWidgetCache();
-
+        mIndexer = new AlphabeticIndexCompat(context);
         mIconClickListener = iconClickListener;
         mIconLongClickListener = iconLongClickListener;
         mIndent = context.getResources().getDimensionPixelSize(R.dimen.widget_section_indent);
     }
 
-    public void setWidgetsModel(WidgetsModel w) {
-        mWidgetsModel = w;
+    public void setWidgets(MultiHashMap<PackageItemInfo, ArrayList<WidgetListRowEntry>> w) {
+        this.mEntries.clear();
+        Comparator widgetItemComparator = new WidgetItemComparator();
+        for (Map.Entry entry : w.entrySet()) {
+            WidgetListRowEntry widgetListRowEntry = new WidgetListRowEntry((PackageItemInfo) entry.getKey(), (ArrayList) entry.getValue());
+            widgetListRowEntry.titleSectionName = this.mIndexer.computeSectionName(widgetListRowEntry.pkgItem.title);
+            Collections.sort(widgetListRowEntry.widgets, widgetItemComparator);
+            this.mEntries.add(widgetListRowEntry);
+        }
+        Collections.sort(this.mEntries, new WidgetListRowEntryComparator());
     }
 
     @Override
     public int getItemCount() {
-        if (mWidgetsModel == null) {
-            return 0;
+        return mEntries.size();
+    }
+
+    public List copyWidgetsForPackageUser(PackageUserKey packageUserKey) {
+        for (WidgetListRowEntry widgetListRowEntry : mEntries) {
+            if (widgetListRowEntry.pkgItem.packageName.equals(packageUserKey.mPackageName)) {
+                ArrayList arrayList = new ArrayList(widgetListRowEntry.widgets);
+                Iterator it = arrayList.iterator();
+                while (it.hasNext()) {
+                    if (!((WidgetItem) it.next()).user.equals(packageUserKey.mUser)) {
+                        it.remove();
+                    }
+                }
+                if (arrayList.isEmpty()) {
+                    arrayList = null;
+                }
+                return arrayList;
+            }
         }
-        return mWidgetsModel.getPackageSize();
+        return null;
     }
 
     @Override
     public void onBindViewHolder(WidgetsRowViewHolder holder, int pos) {
-        List<WidgetItem> infoList = mWidgetsModel.getSortedWidgets(pos);
-
-        ViewGroup row = holder.cellContainer;
-
-        // Add more views.
-        // if there are too many, hide them.
-        int diff = infoList.size() - row.getChildCount();
-
-        if (diff > 0) {
-            for (int i = 0; i < diff; i++) {
-                WidgetCell widget = (WidgetCell) mLayoutInflater.inflate(
-                        R.layout.widget_cell, row, false);
-
-                // set up touch.
-                widget.setOnClickListener(mIconClickListener);
-                widget.setOnLongClickListener(mIconLongClickListener);
-                LayoutParams lp = widget.getLayoutParams();
-                lp.height = widget.cellSize;
-                lp.width = widget.cellSize;
-                widget.setLayoutParams(lp);
-
-                row.addView(widget);
+        WidgetListRowEntry widgetListRowEntry = mEntries.get(pos);
+        List list = widgetListRowEntry.widgets;
+        ViewGroup viewGroup = holder.cellContainer;
+        int max = Math.max(0, list.size() - 1) + list.size();
+        int childCount = viewGroup.getChildCount();
+        if (max > childCount) {
+            while (childCount < max) {
+                if ((childCount & 1) == 1) {
+                    this.mLayoutInflater.inflate(R.layout.widget_list_divider, viewGroup);
+                } else {
+                    WidgetCell widgetCell = (WidgetCell) this.mLayoutInflater.inflate(R.layout.widget_cell, viewGroup, false);
+                    widgetCell.setOnClickListener(this.mIconClickListener);
+                    widgetCell.setOnLongClickListener(this.mIconLongClickListener);
+                    viewGroup.addView(widgetCell);
+                }
+                childCount++;
             }
-        } else if (diff < 0) {
-            for (int i = infoList.size(); i < row.getChildCount(); i++) {
-                row.getChildAt(i).setVisibility(View.GONE);
+        } else if (max < childCount) {
+            for (int i2 = max; i2 < childCount; i2++) {
+                viewGroup.getChildAt(i2).setVisibility(8);
             }
         }
-
-        // Bind the views in the application info section.
-        holder.title.applyFromPackageItemInfo(mWidgetsModel.getPackageItemInfo(pos));
-
-        // Bind the view in the widget horizontal tray region.
-        for (int i = 0; i < infoList.size(); i++) {
-            WidgetCell widget = (WidgetCell) row.getChildAt(i);
-            widget.applyFromCellItem(infoList.get(i), mWidgetPreviewLoader);
-            widget.ensurePreview();
-            widget.setVisibility(View.VISIBLE);
+        holder.title.applyFromPackageItemInfo(widgetListRowEntry.pkgItem);
+        for (max = 0; max < list.size(); max++) {
+            WidgetCell widgetCell2 = (WidgetCell) viewGroup.getChildAt(max * 2);
+            widgetCell2.applyFromCellItem((WidgetItem) list.get(max), this.mWidgetPreviewLoader);
+            widgetCell2.ensurePreview();
+            widgetCell2.setVisibility(View.VISIBLE);
+            if (max > 0) {
+                viewGroup.getChildAt((max * 2) - 1).setVisibility(0);
+            }
         }
     }
 
@@ -134,13 +163,13 @@ public class WidgetsListAdapter extends Adapter<WidgetsRowViewHolder> {
 
     @Override
     public void onViewRecycled(WidgetsRowViewHolder holder) {
-        int total = holder.cellContainer.getChildCount();
-        for (int i = 0; i < total; i++) {
-            WidgetCell widget = (WidgetCell) holder.cellContainer.getChildAt(i);
-            widget.clear();
+        int childCount = holder.cellContainer.getChildCount();
+        for (int i = 0; i < childCount; i += 2) {
+            ((WidgetCell) holder.cellContainer.getChildAt(i)).clear();
         }
     }
 
+    @Override
     public boolean onFailedToRecycleView(WidgetsRowViewHolder holder) {
         // If child views are animating, then the RecyclerView may choose not to recycle the view,
         // causing extraneous onCreateViewHolder() calls.  It is safe in this case to continue
@@ -152,5 +181,14 @@ public class WidgetsListAdapter extends Adapter<WidgetsRowViewHolder> {
     @Override
     public long getItemId(int pos) {
         return pos;
+    }
+
+    public class WidgetListRowEntryComparator implements Comparator<WidgetListRowEntry> {
+        private final LabelComparator mComparator = new LabelComparator();
+
+        @Override
+        public int compare(WidgetListRowEntry widgetListRowEntry, WidgetListRowEntry widgetListRowEntry2) {
+            return this.mComparator.compare(widgetListRowEntry.pkgItem.title.toString(), widgetListRowEntry2.pkgItem.title.toString());
+        }
     }
 }

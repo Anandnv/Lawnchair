@@ -58,12 +58,14 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
 
 import ch.deletescape.lawnchair.UninstallDropTarget.DropTargetSource;
 import ch.deletescape.lawnchair.accessibility.AccessibileDragListenerAdapter;
 import ch.deletescape.lawnchair.accessibility.OverviewAccessibilityDelegate;
 import ch.deletescape.lawnchair.accessibility.OverviewScreenAccessibilityDelegate;
 import ch.deletescape.lawnchair.accessibility.WorkspaceAccessibilityHelper;
+import ch.deletescape.lawnchair.badge.FolderBadgeInfo;
 import ch.deletescape.lawnchair.compat.AppWidgetManagerCompat;
 import ch.deletescape.lawnchair.config.FeatureFlags;
 import ch.deletescape.lawnchair.dragndrop.DragController;
@@ -79,6 +81,7 @@ import ch.deletescape.lawnchair.graphics.DragPreviewProvider;
 import ch.deletescape.lawnchair.util.ItemInfoMatcher;
 import ch.deletescape.lawnchair.util.LongArrayMap;
 import ch.deletescape.lawnchair.util.MultiStateAlphaController;
+import ch.deletescape.lawnchair.util.PackageUserKey;
 import ch.deletescape.lawnchair.util.Thunk;
 import ch.deletescape.lawnchair.util.VerticalFlingDetector;
 import ch.deletescape.lawnchair.util.WallpaperOffsetInterpolator;
@@ -3863,6 +3866,35 @@ public class Workspace extends PagedView
                     ((FolderInfo) info).itemsChanged(false);
                 }
                 // process all the shortcuts
+                return false;
+            }
+        });
+    }
+
+
+    public void updateIconBadges(final Set set) {
+        final PackageUserKey packageUserKey = new PackageUserKey(null, null);
+        final HashSet hashSet = new HashSet();
+        mapOverItems(true, new ItemOperator() {
+            @Override
+            public boolean evaluate(ItemInfo itemInfo, View view) {
+                if ((itemInfo instanceof ShortcutInfo) && (view instanceof BubbleTextView) && packageUserKey.updateFromItemInfo(itemInfo) && set.contains(packageUserKey)) {
+                    ((BubbleTextView) view).applyBadgeState(itemInfo, true);
+                    hashSet.add(Long.valueOf(itemInfo.container));
+                }
+                return false;
+            }
+        });
+        mapOverItems(false, new ItemOperator() {
+            @Override
+            public boolean evaluate(ItemInfo itemInfo, View view) {
+                if ((itemInfo instanceof FolderInfo) && hashSet.contains(Long.valueOf(itemInfo.id)) && (view instanceof FolderIcon)) {
+                    FolderBadgeInfo folderBadgeInfo = new FolderBadgeInfo();
+                    for (ShortcutInfo badgeInfoForItem : ((FolderInfo) itemInfo).contents) {
+                        folderBadgeInfo.addBadgeInfo(Workspace.this.mLauncher.getPopupDataProvider().getBadgeInfoForItem(badgeInfoForItem));
+                    }
+                    ((FolderIcon) view).setBadgeInfo(folderBadgeInfo);
+                }
                 return false;
             }
         });
